@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Apex Speedometer</title><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#06090e"><link rel="icon" href="icon-192.png">
+<style>
+:root{--bg:#06090e;--cd:#0c121b;--ln:#18212d;--tx:#e6e2d3;--mu:#6c7a8a;--br:#c9a24b;--c:hsl(165,80%,60%)}
+*{box-sizing:border-box;margin:0}
+body{background:radial-gradient(900px 600px at 50% 0,#0f1826,var(--bg));color:var(--tx);font:14px "Segoe UI",system-ui,sans-serif;min-height:100vh;padding:10px 14px 30px;user-select:none;font-variant-numeric:tabular-nums}
+body.over{animation:pl 1s ease-in-out infinite}
+@keyframes pl{50%{box-shadow:inset 0 0 90px #ff3b4d40}}
+@media(prefers-reduced-motion:reduce){body.over{animation:none;box-shadow:inset 0 0 60px #ff3b4d40}}
+header{display:flex;gap:8px;align-items:center;max-width:520px;margin:0 auto 6px}
+h1{font-size:15px;font-weight:500;letter-spacing:.14em;color:var(--br);margin-right:auto}
+h2{font-size:12px;font-weight:500;color:var(--mu);margin:14px 0 6px}
+button,input{font:inherit;color:var(--tx);background:none;border:1px solid var(--ln);border-radius:8px;padding:6px 11px}
+button{cursor:pointer;color:var(--mu)}button:hover{border-color:var(--br);color:var(--tx)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--br)}button.on{border-color:var(--br);color:var(--br)}
+.pill{display:flex;gap:6px;align-items:center;color:var(--mu);font-size:12px}.pill i{width:8px;height:8px;border-radius:50%;background:#444}
+.pill.g i{background:#3ddbb0}.pill.y i{background:#ffb454}.pill.r i{background:#ff5d6c}
+main{max-width:520px;margin:auto;display:grid;gap:14px}
+.mu{color:var(--mu)}
+#hero{aspect-ratio:1;width:100%}#g{width:100%;height:100%;display:block}
+body.hud #hero,body.hud #rd{transform:scaleX(-1)}
+#rd{text-align:center;margin-top:-8px}
+#sp1{font-size:min(17vw,84px);font-weight:200;line-height:1;color:var(--c);text-shadow:0 0 22px var(--c)}
+#sf{font-size:.4em;opacity:.75}#ul{color:var(--mu);letter-spacing:.2em;font-size:12px;margin-top:4px}
+.gl{display:flex;justify-content:center;gap:10px;align-items:baseline;color:var(--mu);margin-top:12px}
+#gn{font-size:30px;font-weight:300;color:var(--br)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.t{border:1px solid var(--ln);border-radius:10px;padding:8px 10px;background:var(--cd)}.t small{color:var(--mu);display:block;margin-bottom:2px;font-size:12px}.t b{font-size:16px;font-weight:500}
+.eta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.eta input{width:120px}
+summary{cursor:pointer;color:var(--mu);padding:6px 0}
+.gr{display:flex;align-items:center;gap:8px;margin:6px 0}.gr b{width:14px;text-align:center;color:var(--mu)}.gr.a b{color:var(--br)}
+.tr{position:relative;flex:1;height:10px;background:#0b1118;border-radius:5px;overflow:hidden}
+.tr i{position:absolute;top:0;bottom:0;border-radius:5px}.u{background:#1e2c40}.s{background:#8a6a28}.gr.a .s{background:var(--br)}
+.mk{position:absolute;top:-1px;bottom:-1px;width:2px;background:#fff;box-shadow:0 0 6px #fff}
+dialog{background:var(--cd);color:var(--tx);border:1px solid var(--ln);border-radius:14px;padding:18px;max-width:440px;width:92vw}
+dialog::backdrop{background:#000a}
+dialog label{display:grid;grid-template-columns:1fr 150px;gap:8px;align-items:center;margin:7px 0}
+dialog label input[type=checkbox]{justify-self:start}
+.dg{border:1px solid #5a3a1a;background:#1a120a;border-radius:10px;padding:10px 12px;color:#e8cf9c;font-size:13px;line-height:1.5}.dg[hidden]{display:none}.R{display:grid;gap:14px;align-content:start}.dg{grid-area:dg}#hero{grid-area:hero}#rd{grid-area:rd}.R{grid-area:rest}
+@media(orientation:landscape) and (max-height:760px){body{padding:6px 12px}header{max-width:none;margin-bottom:4px}main{max-width:none;grid-template-columns:min(calc(100vh - 52px),52vw) minmax(0,1fr);grid-template-areas:"dg dg" "hero rd" "hero rest";grid-template-rows:auto auto 1fr;column-gap:18px;row-gap:8px;align-items:start}#rd{margin-top:0;text-align:left}.gl{justify-content:flex-start;margin-top:6px}#sp1{font-size:min(15vh,76px)}.R{max-height:calc(100vh - 175px);overflow:auto}}</style></head><body>
+<header><h1>APEX <span class="mu" style="font-size:11px;letter-spacing:0;font-weight:400">build 3</span></h1><div class="pill" id="gps"><i></i><span id="gpst">GPS off</span></div>
+<button id="bStart">Start</button><button id="bUnit">km/h</button><button id="bSet">Settings</button></header>
+<main>
+<div class="dg" id="diag" hidden role="alert"></div>
+<section id="hero"><canvas id="g"></canvas></section>
+<div id="rd"><div id="sp1"><span id="si">0</span><span id="sf">.0</span></div><div id="ul">KM/H</div><div id="unc" class="mu" style="font-size:12px;margin-top:2px"></div>
+<div class="gl"><span>Suggested gear</span><b id="gn">N</b><span id="gwhy">Stationary</span></div></div>
+<div class="R"><div class="tiles" id="tiles"></div>
+<div class="eta"><input id="dIn" type="number" min="0" step="0.1" placeholder="Distance to go"><button id="bDest">Set</button><span id="eta" class="mu">Enter the distance to your destination for arrival time</span></div>
+<details><summary>More</summary><div class="tiles" id="more"></div>
+<h2>Best speed for each gear (bright = power band, dim = usable)</h2><div id="gmap"></div>
+<h2>GPS check</h2><div id="gchk" class="mu"></div><h2>Last 90 seconds</h2><canvas id="sk" height="64" style="width:100%"></canvas>
+<div class="eta" style="margin-top:14px"><button id="bDemo">Demo</button><button id="bHud">HUD mirror</button><button id="bFs">Fullscreen</button><button id="bReset">Reset trip</button></div></details></div>
+</main>
+<dialog id="dlg"><h2>Car &amp; display settings</h2><form method="dialog" id="fm"></form></dialog>
+<script>
+const $=i=>document.getElementById(i);
+const ld=k=>{try{return JSON.parse(localStorage.getItem(k))||{}}catch(e){return{}}};
+const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const S=Object.assign({mph:false,limit:120,max:200,tw:195,ta:65,rim:15,fd:4.1,gears:'3.58,2.04,1.35,0.97,0.76',idle:800,red:6500,eco:2000,peak:5000,beep:true},ld('apex.cfg'));
+let REC=ld('apex.rec').v||0,KV,DV,UL,DL,C,G;
+const fresh=()=>({est:0,a:0,dem:0,fl:0,lt:0,dist:0,tt:0,tm:0,max:0,g:0,gT:0,alt:null,hd:null,acc:null,prev:null,hist:[],tz:{s:'arm',t:0,r:null},P:4,still:true,anc:null,sc:0,mc:0,rej:0,src:'–',buf:[]});
+let st=fresh(),dest=null,watch=null,sim=null,ac=null,lastBeep=0;
+function units(){KV=S.mph?2.236936:3.6;DV=S.mph?1/1609.344:.001;UL=S.mph?'mph':'km/h';DL=S.mph?'mi':'km';
+ C=Math.PI*(S.rim*25.4+2*S.tw*S.ta/100)/1000;G=S.gears.split(',').map(Number).filter(x=>x>0);
+ $('ul').textContent=UL.toUpperCase();$('bUnit').textContent=UL;$('dIn').placeholder='Distance to go ('+DL+')';buildMap();buildBg();}
+const rpm=(v,i)=>v/C*60*G[i]*S.fd;
+/* ---------- GPS pipeline ---------- */
+function hav(a,b){const R=6371000,r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r,
+ h=Math.sin(dl/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+/* ================= PRECISION ENGINE =================
+ 1 Quality gate   fixes worse than maxAcc metres are ignored
+ 2 Source model   chip Doppler speed is trusted; speed derived from positions is only used when the
+                  movement is larger than the position error over a 5 s baseline (stops GPS drift looking like speed)
+ 3 Zero-velocity lock  once stopped (3 quiet fixes) speed is held at exactly 0 until real movement is confirmed
+ 4 Kalman filter  gain adapts to signal quality: poor signal = smoother, good signal = no lag
+ 5 Outlier guard  a jump over 12 m/s in one second is distrusted
+ 6 Distance       trapezoid integration of filtered speed, never while locked                     */
+const E={maxAcc:60,stopIn:.55,goOut:1.1,q:4,jump:12};
+function feed(v,acc,t,hd,alt,lat,lon){
+ acc=acc||99;const dt=st.lt?t-st.lt:0;
+ if(st.lt&&dt<=0)return;
+ st.acc=acc;if(acc>E.maxAcc){st.rej++;return}
+ const hasD=v!=null&&!isNaN(v);let m,sig,src;
+ if(lat!=null)st.buf.push({lat,lon,t,acc});
+ while(st.buf.length>2&&t-st.buf[0].t>5)st.buf.shift();
+ if(hasD){m=Math.max(0,v);sig=Math.max(.25,acc/25);src='Doppler'}
+ else if(lat!=null&&st.buf.length>1){const o=st.buf[0],d=hav(o,{lat,lon}),w=t-o.t;
+  m=w>1&&d>2*Math.max(acc,o.acc)?d/w:0;sig=Math.max(1,acc*1.4/Math.max(w,1));src='derived'}
+ else{m=0;sig=3;src='none'}
+ if(m<E.stopIn){st.sc++;st.mc=0}else if(m>=E.goOut){st.mc++;st.sc=0}
+ if(!st.still&&st.sc>=3&&st.est<2.5){st.still=true;st.anc=null}
+ if(st.still&&!st.anc&&lat!=null)st.anc={lat,lon,n:1};
+ else if(st.still){
+  const away=st.anc&&lat!=null?hav(st.anc,{lat,lon}):0;
+  const go=src==='Doppler'?((m>=3&&acc<=20)||(st.mc>=2&&away>acc)||st.mc>=4):(st.mc>=5&&away>2.5*acc);
+  if(go){st.still=false;st.anc=null}}
+ const p0=st.est;
+ if(st.still){st.est=0;st.a=0;st.P=.04;
+  if(st.anc&&lat!=null){const a=st.anc,n=Math.min(a.n+1,30);a.lat+=(lat-a.lat)/n;a.lon+=(lon-a.lon)/n;a.n=n}}
+ else if(dt>0&&dt<8){
+  if(Math.abs(m-st.est)>E.jump)sig*=6;
+  st.P+=E.q*dt;const K=st.P/(st.P+sig*sig);st.est+=K*(m-st.est);st.P*=1-K;
+  st.a+=((st.est-p0)/dt-st.a)*.45}
+ else{st.est=m;st.P=sig*sig;st.a=0}
+ if(dt>0&&dt<8){st.tt+=dt;if(!st.still&&st.est>1){st.dist+=.5*(st.est+p0)*dt;st.tm+=dt}}
+ st.lt=t;st.fl=performance.now();st.src=src;
+ if(hd!=null&&!isNaN(hd)&&st.est>1)st.hd=hd;if(alt!=null)st.alt=alt;
+ if(!st.still&&st.mc>=2){if(st.est>st.max)st.max=st.est;if(st.est>REC)REC=st.est}
+ const z=st.tz,TV=S.mph?26.8224:27.7778;
+ if(z.s==='arm'&&st.est>.8){z.s='run';z.t=t}
+ else if(z.s==='run'){if(st.est<.8)z.s='arm';else if(st.est>=TV){z.s='done';z.r=t-z.t}}
+ else if(z.s==='done'&&st.est<.8)z.s='arm';
+ pick();
+}
+const GC={nf:0,nul:0,src:'–',perm:'?'};
+const FILEMSG='<b>This page is open as a file.</b> Chrome often blocks GPS for files. Host it over https (or run it from localhost) and GPS will work.';
+function diag(t){const d=$('diag');d.hidden=!t;d.innerHTML=t||''}
+function preflight(){
+ if(location.protocol==='file:'||!isSecureContext)diag(FILEMSG);
+ try{navigator.permissions.query({name:'geolocation'}).then(p=>{GC.perm=p.state;if(p.state==='denied')diag('<b>Location is blocked for this page.</b> Tap the lock icon by the address, open Permissions, set Location to Allow, then reload.');p.onchange=()=>{GC.perm=p.state}})}catch(e){}
+}
+function onPos(p){const c=p.coords;GC.nf++;GC.src=c.speed==null?'position only (no speed)':'GPS chip';
+ if(c.speed==null)GC.nul++;else GC.nul=0;
+ if(c.speed!=null&&c.accuracy<=50)diag('');
+ else if(GC.nul>=6&&c.accuracy>30)diag('<b>Getting a position but no speed.</b> That usually means a laptop or Wi-Fi location. Use a phone with real GPS, outdoors, with Location on high accuracy.');
+ feed(c.speed,c.accuracy,p.timestamp/1000,c.heading,c.altitude,c.latitude,c.longitude)}
+function onErr(e){const f=location.protocol==='file:'?FILEMSG+'<br>':'';
+ setGps('r',['','Location blocked','No location signal','Waiting for GPS…'][e.code]||'GPS error');
+ if(e.code===1)diag(f+'<b>Location is blocked.</b> Allow it in Chrome (lock icon by the address, Permissions, Location) and make sure Location is on in your phone settings.');
+ else if(e.code===2)diag(f+'<b>No location signal.</b> Turn Location on with high accuracy, then go outdoors or next to a window.');
+ else setGps('y','Waiting for GPS lock…')}
+function setGps(c,t){$('gps').className='pill '+c;$('gpst').textContent=t}
+function start(){
+ if(!ac)try{ac=new AudioContext()}catch(e){}
+ if(watch!=null){navigator.geolocation.clearWatch(watch);watch=null;$('bStart').textContent='Start';$('bStart').classList.remove('on');setGps('','GPS off');return}
+ if(!navigator.geolocation){setGps('r','No geolocation in this browser');return}
+ stopSim();setGps('y','Searching for GPS…');preflight();
+ watch=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:30000});
+ $('bStart').textContent='Stop';$('bStart').classList.add('on');
+ try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}try{document.documentElement.requestFullscreen().then(()=>screen.orientation.lock('landscape')).catch(()=>{})}catch(e){}
+}
+function stopSim(){if(sim){clearInterval(sim);sim=null;$('bDemo').classList.remove('on')}}
+function demo(){
+ if(sim){stopSim();return}
+ if(watch!=null)start();let t0=Date.now();$('bDemo').classList.add('on');setGps('g','Demo ±3 m');
+ sim=setInterval(()=>{const s=(Date.now()-t0)/1000,v=Math.max(0,16+15*Math.sin(s/9-1.57)+Math.sin(s*1.7)*.6);
+  feed(v+(Math.random()-.5)*.15,3,Date.now()/1000,(s*6)%360,1250+s%40);},250);
+}
+/* ---------- gear intelligence ---------- */
+function pick(){
+ const v=st.est,now=performance.now();let why;
+ if(v<0.6){st.g=0;st.why='Stationary — ready in 1st';st.n='N';return}
+ st.dem+=(Math.min(1,Math.max(0,st.a/2.2))-st.dem)*0.25;
+ let tgt=S.eco+(S.peak-S.eco)*Math.pow(st.dem,.8);
+ if(st.a<-1.2){tgt=S.eco*1.15;why='Slowing — engine braking'}
+ else if(st.dem>.35)why='Accelerating — holding revs for power';
+ else why=st.dem>.08?'Gentle acceleration — balanced':'Cruising — economy zone';
+ let best=-1,bc=1e9;
+ G.forEach((_,i)=>{const r=rpm(v,i);let c;
+  if(r<Math.max(S.idle*1.25,1100)||r>S.red*.94)c=1e6;
+  else{c=((r-tgt)/1000)**2;if(r<1500)c+=1.5*(1500-r)/500;if(r>S.red*.85)c+=2}
+  if(i===st.g)c-=(now-st.gT<1800?1.3:.35); // hysteresis: no flicker between gears
+  if(c<bc){bc=c;best=i}});
+ if(best<0)best=0;if(best!==st.g){st.g=best;st.gT=now}
+ st.why=why;st.n=String(best+1);
+}
+function buildMap(){const m=$('gmap');m.innerHTML='';
+ G.forEach((g,i)=>{const f=r=>r/60*C/(g*S.fd)*KV,P=x=>Math.min(100,x/S.max*100),
+  u0=f(Math.max(S.idle*1.25,1100)),u1=f(S.red*.94),a=f(Math.max(1500,S.idle*1.8)),b=f(Math.min(S.peak,S.red*.92));
+  m.insertAdjacentHTML('beforeend',`<div class="gr" id="gr${i}"><b>${i+1}</b><div class="tr"><i class="u" style="left:${P(u0)}%;width:${Math.max(0,P(u1)-P(u0))}%"></i><i class="s" style="left:${P(a)}%;width:${Math.max(0,P(b)-P(a))}%"></i><u class="mk"></u></div></div>`)})}
+/* ---------- drawing ---------- */
+const hue=f=>'hsl('+((165-Math.min(1,Math.max(0,(f-.5)/.55))*170+360)%360)+',80%,60%)';
+function resize(){const c=$('g'),d=devicePixelRatio||1,w=c.clientWidth;c.width=c.height=Math.round(w*d);const k=$('sk');k.width=Math.round(k.clientWidth*d);k.height=Math.round(64*d);buildBg()}
+let bg=null;
+function buildBg(){
+ const W=$('g').width;if(!W)return;bg=document.createElement('canvas');bg.width=bg.height=W;
+ const x=bg.getContext('2d'),c=W/2,T=Math.PI*2,a0=.75*Math.PI,sw=1.5*Math.PI,an=f=>a0+sw*f;
+ const con=(st)=>{const g=x.createConicGradient(0,c,c);st.forEach((s,i)=>g.addColorStop(i/(st.length-1),s));return g};
+ const ring=(r,w,fill)=>{x.beginPath();x.arc(c,c,r,0,T);x.arc(c,c,r-w,0,T,true);x.fillStyle=fill;x.fill('evenodd')};
+ ring(W*.5,W*.03,con(['#d3dae0','#5a636b','#bcc3c9','#3b4248','#aab2b8','#d3dae0']));
+ ring(W*.47,W*.08,con(['#f0d27a','#8a6a28','#dab350','#6f5320','#c9a24b','#f0d27a']));
+ ring(W*.47,W*.08,'rgba(30,18,0,.28)');
+ let sd=7;const rnd=()=>(sd=(sd*16807)%2147483647)/2147483647;
+ for(let i=0;i<260;i++){const a=rnd()*T,r=W*(.395+rnd()*.075),s=W*(.001+rnd()*.005);x.fillStyle=rnd()<.6?'rgba(35,25,8,.35)':'rgba(120,150,120,.16)';x.beginPath();x.arc(c+r*Math.cos(a),c+r*Math.sin(a),s,0,T);x.fill()}
+ ring(W*.39,W*.012,'#080b10');
+ let g=x.createRadialGradient(c,c*.9,0,c,c,W*.38);g.addColorStop(0,'#16243f');g.addColorStop(1,'#060a13');
+ x.fillStyle=g;x.beginPath();x.arc(c,c,W*.378,0,T);x.fill();
+ x.strokeStyle='#a98532';x.lineWidth=W*.003;x.beginPath();x.arc(c,c,W*.372,0,T);x.stroke();
+ x.lineCap='round';x.strokeStyle='rgba(200,50,50,.85)';x.lineWidth=W*.008;x.beginPath();x.arc(c,c,W*.358,an(Math.min(1,S.limit/S.max)),an(1));x.stroke();
+ const s=S.max<=100?10:S.max<=240?20:40;x.textAlign='center';x.textBaseline='middle';x.fillStyle='#ece7d6';x.font='bold '+(W*.04)+'px Bahnschrift,"Arial Narrow",Segoe UI,sans-serif';
+ for(let k=0,v=0;v<=S.max+.01;k++,v=k*s/4){const a=an(v/S.max),M=k%4===0,H=k%2===0,r1=W*.35,r2=r1-W*(M?.045:H?.03:.018);
+  x.strokeStyle='#ece7d6';x.lineWidth=M?W*.005:W*.0025;x.beginPath();x.moveTo(c+r1*Math.cos(a),c+r1*Math.sin(a));x.lineTo(c+r2*Math.cos(a),c+r2*Math.sin(a));x.stroke();
+  if(M){const r=W*.27;x.fillText(Math.round(v),c+r*Math.cos(a),c+r*Math.sin(a))}}
+ x.strokeStyle='#ece7d6';x.lineWidth=W*.005;x.beginPath();x.moveTo(c,c+W*.33);x.lineTo(c,c+W*.36);x.stroke();
+ g=x.createRadialGradient(c-W*.04,c-W*.05,W*.01,c,c,W*.18);g.addColorStop(0,'#f4d983');g.addColorStop(.6,'#c99b38');g.addColorStop(1,'#80601f');
+ x.fillStyle=g;x.beginPath();x.arc(c,c,W*.175,0,T);x.fill();
+ x.strokeStyle='rgba(60,40,5,.55)';x.lineWidth=W*.0025;x.beginPath();x.arc(c,c,W*.155,0,T);x.stroke();
+ x.fillStyle='#5e4510';x.font='bold '+(W*.019)+'px "Arial Narrow",Segoe UI,sans-serif';x.fillText('APEX',c,c+W*.085);x.font=(W*.015)+'px "Arial Narrow",Segoe UI,sans-serif';x.fillText(UL.toUpperCase()+' · GPS',c,c+W*.11);
+}
+function gauge(u){
+ const cv=$('g'),W=cv.width;if(!bg||bg.width!==W)buildBg();if(!bg)return;
+ const x=cv.getContext('2d'),c=W/2,T=Math.PI*2,a0=.75*Math.PI,sw=1.5*Math.PI,f=Math.min(1.03,u/S.max),a=a0+sw*f,col=hue(u/S.limit);
+ x.clearRect(0,0,W,W);x.drawImage(bg,0,0);
+ if(f>0){x.lineCap='round';x.lineWidth=W*.006;x.strokeStyle=col;x.shadowColor=col;x.shadowBlur=W*.02;x.beginPath();x.arc(c,c,W*.384,a0,a);x.stroke();x.shadowBlur=0}
+ // odometer window: trip distance, last digit = tenths
+ const d=String(Math.floor(st.dist*DV*10)%10000000).padStart(7,'0'),ow=W*.27,oh=W*.052,ox=c-ow/2,oy=c+W*.235,cw=ow/7;
+ x.fillStyle='#04060a';x.strokeStyle='#8a6a28';x.lineWidth=W*.004;x.beginPath();x.roundRect(ox,oy,ow,oh,W*.006);x.fill();x.stroke();
+ x.font='bold '+(oh*.72)+'px Consolas,monospace';x.textAlign='center';x.textBaseline='middle';
+ for(let i=0;i<7;i++){const px=ox+cw*(i+.5);if(i===6){x.fillStyle='#ece7d6';x.fillRect(ox+cw*6+1,oy+2,cw-3,oh-4);x.fillStyle='#04060a'}else x.fillStyle='#ece7d6';x.fillText(d[i],px,oy+oh*.54)}
+ x.save();x.translate(c,c);x.rotate(a);x.shadowColor='rgba(0,0,0,.6)';x.shadowBlur=W*.012;x.shadowOffsetY=W*.008;
+ x.fillStyle='#d9b24f';x.beginPath();x.moveTo(-W*.075,-W*.009);x.lineTo(W*.345,-W*.0028);x.lineTo(W*.345,W*.0028);x.lineTo(-W*.075,W*.009);x.closePath();x.fill();
+ x.shadowColor='transparent';x.strokeStyle='rgba(255,240,170,.7)';x.lineWidth=W*.0016;x.beginPath();x.moveTo(-W*.06,-W*.004);x.lineTo(W*.33,-W*.0016);x.stroke();x.restore();
+ const g=x.createRadialGradient(c-W*.012,c-W*.014,W*.003,c,c,W*.045);g.addColorStop(0,'#f6dc8a');g.addColorStop(.6,'#c4952f');g.addColorStop(1,'#6c501a');
+ x.shadowColor='rgba(0,0,0,.6)';x.shadowBlur=W*.012;x.fillStyle=g;x.beginPath();x.arc(c,c,W*.045,0,T);x.fill();x.shadowBlur=0;
+}
+function spark(){const k=$('sk'),x=k.getContext('2d'),w=k.width,h=k.height,H=st.hist;x.clearRect(0,0,w,h);if(H.length<2)return;
+ const m=Math.max(10,...H);x.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--c')||'#3ddbb0';x.strokeStyle=hue(H[H.length-1]*KV/S.limit);x.lineWidth=2;x.beginPath();
+ H.forEach((v,i)=>{const px=i/(89)*w,py=h-4-(v/m)*(h-8);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()}
+/* ---------- render loop (60 fps, predictive, no perceptible lag) ---------- */
+let last=performance.now(),disp=0,lastT='';
+function loop(t){const dt=Math.min(.1,(t-last)/1000);last=t;
+ const raw=(t-st.fl)/1000,age=Math.min(raw,1.2),fd=raw>4?Math.max(0,1-(raw-4)/4):1,tg=st.still?0:Math.max(0,(st.est+st.a*age*.6)*fd);
+ disp+=(tg-disp)*(1-Math.exp(-dt*16));if(disp<.01&&tg===0)disp=0;
+ const u=disp*KV,s=u.toFixed(1);gauge(u);
+ if(s!==lastT){lastT=s;const p=s.split('.');$('si').textContent=p[0];$('sf').textContent='.'+p[1]}
+ document.documentElement.style.setProperty('--c',hue(u/S.limit));
+ const over=u>S.limit;document.body.classList.toggle('over',over);
+ if(over&&S.beep&&ac&&t-lastBeep>2500){lastBeep=t;try{const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.18)}catch(e){}}
+ requestAnimationFrame(loop)}
+/* ---------- panels (4 Hz) ---------- */
+const TL=[['top','Top speed'],['avm','Avg moving'],['dist','Distance'],['tt','Trip time'],['rec','All-time record'],['ava','Avg overall'],['tm','Moving time'],['acc','Acceleration'],['alt','Altitude'],['hd','Heading'],['zero','0-100']];
+const tl=a=>`<div class="t"><small id="${a[0]}l">${a[1]}</small><b id="${a[0]}">–</b></div>`;
+$('tiles').innerHTML=TL.slice(0,4).map(tl).join('');$('more').innerHTML=TL.slice(4).map(tl).join('');
+const hms=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(s%60).padStart(2,'0')};
+const sp=(v,d=1)=>(v*KV).toFixed(d);
+function panels(){
+ const age=(performance.now()-st.fl)/1000;$('unc').textContent=!st.fl?'':st.still?'stationary · locked at 0':'± '+(Math.sqrt(st.P)*KV).toFixed(1)+' '+UL;$('gchk').textContent=location.protocol.replace(':','')+' · '+(isSecureContext?'secure':'NOT secure')+' · permission '+GC.perm+' · fixes '+GC.nf+' · speed from '+GC.src+(st.still?' · stationary lock':' · moving')+' · rejected '+st.rej+(st.acc!=null?' · ±'+Math.round(st.acc)+' m':'');
+ if(watch!=null){if(!st.fl)setGps('y','Searching for GPS…');else if(age>5)setGps('r','Signal lost ('+Math.round(age)+' s)');
+  else{const a=st.acc;setGps(a<=10?'g':a<=25?'y':'r','GPS ±'+Math.round(a)+' m'+(a<=10?' · excellent':a<=25?' · good':' · weak'))}}
+ $('top').textContent=sp(st.max)+' '+UL;$('rec').textContent=sp(REC)+' '+UL;
+ $('avm').textContent=st.tm>2?sp(st.dist/st.tm)+' '+UL:'–';$('ava').textContent=st.tt>2?sp(st.dist/st.tt)+' '+UL:'–';
+ $('dist').textContent=(st.dist*DV).toFixed(st.dist*DV<10?3:2)+' '+DL;$('tt').textContent=hms(st.tt);$('tm').textContent=hms(st.tm);
+ $('acc').textContent=(st.a>=0?'+':'')+st.a.toFixed(1)+' m/s² · '+(st.a/9.81).toFixed(2)+' g';
+ $('alt').textContent=st.alt!=null?Math.round(st.alt)+' m':'–';
+ $('hd').textContent=st.hd!=null?Math.round(st.hd)+'° '+['N','NE','E','SE','S','SW','W','NW'][Math.round(st.hd/45)%8]:'–';
+ const z=st.tz;$('zerol').textContent='0–'+(S.mph?'60 mph':'100 km/h');$('zero').textContent=z.r!=null?z.r.toFixed(2)+' s':z.s==='run'?'running…':'ready';
+ $('gn').textContent=st.n||'N';$('gwhy').textContent=st.why||'Stationary';
+ G.forEach((_,i)=>{const e=$('gr'+i);if(!e)return;e.classList.toggle('a',st.est>.6&&i===st.g);e.querySelector('.mk').style.left=Math.min(100,disp*KV/S.max*100)+'%'});
+ if(dest){const rem=Math.max(0,dest.m-(st.dist-dest.d0)),cur=st.est,avg=st.tm>5?st.dist/st.tm:0,sp2=avg?(cur>1.5?.7*avg+.3*cur:avg):0;
+  $('eta').textContent=rem<20?'You have arrived':sp2>1?'Arrive '+new Date(Date.now()+rem/sp2*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' · '+hms(rem/sp2)+' left · '+(rem*DV).toFixed(1)+' '+DL+' to go':'Waiting for speed data…'}
+}
+setInterval(panels,250);
+setInterval(()=>{if(watch!=null||sim){st.hist.push(st.est);if(st.hist.length>90)st.hist.shift();spark()}sv('apex.rec',{v:REC})},1000);
+/* ---------- controls & settings ---------- */
+$('bStart').onclick=start;$('bDemo').onclick=demo;
+$('bUnit').onclick=()=>{const o=S.mph;S.mph=!S.mph;const k=S.mph?.621371:1/.621371;S.limit=Math.round(S.limit*k);S.max=Math.round(S.max*k/10)*10;sv('apex.cfg',S);units();if(dest)dest=null,$('eta').textContent='Set your distance again'};
+$('bHud').onclick=e=>{document.body.classList.toggle('hud');e.target.classList.toggle('on')};
+$('bFs').onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(()=>{});
+$('bReset').onclick=()=>{const k=st.est,l=st.lt,f=st.fl,a=st.a;st=Object.assign(fresh(),{est:k,lt:l,fl:f,a,still:k<.6});st.max=k;dest=null;$('eta').textContent='Enter the distance left to your destination'};
+$('bDest').onclick=()=>{const v=parseFloat($('dIn').value);if(v>0)dest={m:v/DV,d0:st.dist}};
+const FL=[['mph','Use miles (mph)','checkbox'],['limit','Speed alert / red zone (display unit)','number'],['max','Gauge maximum','number'],['tw','Tire width (mm)','number'],['ta','Tire aspect (%)','number'],['rim','Rim size (in)','number'],['fd','Final drive ratio','number'],['gears','Gear ratios (comma separated)','text'],['idle','Idle rpm','number'],['red','Redline rpm','number'],['eco','Economy cruise rpm','number'],['peak','Peak power rpm','number'],['beep','Beep when over the alert','checkbox']];
+$('fm').innerHTML=FL.map(f=>`<label>${f[1]}<input name="${f[0]}" type="${f[2]}" step="any"></label>`).join('')+'<div class="eta" style="margin-top:12px;justify-content:flex-end"><button value="x">Cancel</button><button value="ok" id="ok">Save</button></div>';
+$('bSet').onclick=()=>{FL.forEach(f=>{const e=$('fm').elements[f[0]];f[2]==='checkbox'?e.checked=S[f[0]]:e.value=S[f[0]]});$('dlg').showModal()};
+$('dlg').onclose=()=>{if($('dlg').returnValue!=='ok')return;FL.forEach(f=>{const e=$('fm').elements[f[0]];S[f[0]]=f[2]==='checkbox'?e.checked:f[2]==='number'?(parseFloat(e.value)||S[f[0]]):e.value});
+ sv('apex.cfg',S);units()};
+if(location.protocol==='file:')diag(FILEMSG);if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!window.__r){window.__r=1;location.reload()}});addEventListener('resize',resize);document.querySelector('details').ontoggle=resize;units();resize();requestAnimationFrame(loop);
+</script></body></html>
