@@ -53,6 +53,7 @@ dialog label{display:grid;grid-template-columns:1fr 150px;gap:8px;align-items:ce
 body.still #pulse{animation:pu 2.2s ease-out infinite}@keyframes pu{from{transform:translate(-50%,-50%) scale(.45);opacity:.9}to{transform:translate(-50%,-50%) scale(1.15);opacity:0}}
 .poi{width:13px;height:13px;border-radius:50%;background:#e6c36a;border:2px solid #06090e;box-shadow:0 0 6px #000}
 #lanes{display:flex;gap:3px;margin-top:5px}#lanes:empty{display:none}#lanes span{width:20px;height:24px;display:grid;place-items:center;border:1px solid var(--ln);border-radius:4px;color:#566273;font-size:14px}#lanes span.v{color:var(--br);border-color:var(--br)}
+body.nogps #car,body.nogps #pulse{display:none}.poi{cursor:pointer}
 </style></head><body><body>
 <div id="app">
 <section id="mp"><div id="map"></div><div id="mapmsg"></div>
@@ -64,7 +65,7 @@ body.still #pulse{animation:pu 2.2s ease-out infinite}@keyframes pu{from{transfo
 <section id="dp"><canvas id="g"></canvas></section></div>
 <div id="rd"><div id="unc" class="mu"></div>
 <div class="gl"><span>Gear</span><b id="gn">N</b><span id="gwhy">Stationary</span></div></div>
-<div id="bar"><div class="pill" id="gps"><i></i><span id="gpst">GPS off</span></div><span class="mu" style="font-size:11px">build 5</span><button id="bStart">Start</button><button id="bTrip">Trip</button><button id="bSet">Settings</button></div>
+<div id="bar"><div class="pill" id="gps"><i></i><span id="gpst">GPS off</span></div><span class="mu" style="font-size:11px">build 6</span><button id="bStart">Start</button><button id="bTrip">Trip</button><button id="bSet">Settings</button></div>
 <div class="dg" id="diag" hidden role="alert"></div>
 <dialog id="trip"><form method="dialog"><div class="tiles" id="tiles"></div><div class="tiles" id="more" style="margin-top:8px"></div>
 <h2>Best speed for each gear (bright = power band, dim = usable)</h2><div id="gmap"></div><h2>GPS check</h2><div id="gchk" class="mu"></div><h2>Last 90 seconds</h2><canvas id="sk" height="64" style="width:100%"></canvas>
@@ -248,6 +249,7 @@ function panels(){
  $('gn').textContent=st.n||'N';$('gwhy').textContent=st.why||'Stationary';
  G.forEach((_,i)=>{const e=$('gr'+i);if(!e)return;e.classList.toggle('a',st.est>.6&&i===st.g);e.querySelector('.mk').style.left=Math.min(100,disp*KV/S.max*100)+'%'});
  navTick();navUI();
+ if(mapReady&&(!st.pos||st.est<3)){const b=new maplibregl.LngLatBounds();g.forEach(c=>b.extend(c));const o=refPos();if(o)b.extend([o.lon,o.lat]);cam.hold=Date.now()+15000;MAP.fitBounds(b,{padding:70,pitch:0,bearing:0,duration:0})}
 }
 setInterval(panels,250);
 setInterval(()=>{if(watch!=null||sim){st.hist.push(st.est);if(st.hist.length>90)st.hist.shift();spark()}sv('apex.rec',{v:REC})},1000);
@@ -264,7 +266,8 @@ $('bSet').onclick=()=>{FL.forEach(f=>{const e=$('fm').elements[f[0]];f[2]==='che
 $('dlg').onclose=()=>{if($('dlg').returnValue!=='ok')return;FL.forEach(f=>{const e=$('fm').elements[f[0]];S[f[0]]=f[2]==='checkbox'?e.checked:f[2]==='number'?(parseFloat(e.value)||S[f[0]]):e.value});
  sv('apex.cfg',S);units()};
 if(location.protocol==='file:')diag(FILEMSG);if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!window.__r){window.__r=1;location.reload()}});/* ---------- online side: map, search, route, turns ---------- */
-let MAP=null,mapReady=false,NAV=null,lastRR=0,cam={t:0,init:0},POIS=[],bLay=[],lastQ={lat:0,lon:0,t:0};
+let MAP=null,mapReady=false,NAV=null,lastRR=0,cam={t:0,init:0,hold:0},POIS=[],bLay=[],lastQ={lat:0,lon:0,t:0};
+let REF=ld('apex.ref').p||null,preRef=null,preBusy=false;const ACT=new Set(),CACHE={},RAD=70000,refPos=()=>st.pos||REF,PLUS=/^\s*([23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{2,3})(?:\s+(.+))?$/i;
 const ARW={'left':'⬅','slight left':'↖','sharp left':'↰','straight':'⬆','slight right':'↗','right':'➡','sharp right':'↱','uturn':'↶'};
 const fd=m=>S.mph?(m>=160?(m/1609.344).toFixed(1)+' mi':Math.round(m*3.281/10)*10+' ft'):(m>=1000?(m/1000).toFixed(1)+' km':Math.round(m/10)*10+' m');
 function mapMsg(t,ms){const e=$('mapmsg');e.textContent=t||'';if(ms)setTimeout(()=>{if(e.textContent===t)e.textContent=''},ms)}
@@ -290,10 +293,10 @@ function initMap(){
   const lay={'line-cap':'round','line-join':'round'};
   MAP.addLayer({id:'rc',type:'line',source:'route',layout:lay,paint:{'line-color':'#06090e','line-width':15}});
   MAP.addLayer({id:'rl',type:'line',source:'route',layout:lay,paint:{'line-color':'#e6c36a','line-width':8}});
-  mapReady=true;mapMsg(st.pos?'':'Waiting for GPS…')});
+  mapReady=true;mapMsg('');onRef()});
 }
 function camUpdate(now,dt){
- if(!mapReady||!st.pos||now-cam.t<33)return;cam.t=now;
+ if(!mapReady||!st.pos||now-cam.t<33||Date.now()<cam.hold)return;cam.t=now;
  const age=Math.min((now-st.fl)/1000,2),v=st.still?0:st.est,hd=(st.hd||0)*Math.PI/180,d=v*age;
  const la=st.pos.lat+d*Math.cos(hd)/111320,lo=st.pos.lon+d*Math.sin(hd)/(111320*Math.cos(st.pos.lat*Math.PI/180));
  if(!cam.init){cam.lat=la;cam.lon=lo;cam.hd=st.hd||0;cam.init=1;mapMsg('')}
@@ -303,14 +306,14 @@ function camUpdate(now,dt){
 }
 /* exact place: highlight the building you are in, and name it */
 function hereTick(){
- document.body.classList.toggle('still',!!st.still);
+ document.body.classList.toggle('still',!!st.still);document.body.classList.toggle('nogps',!st.pos);
  if(!mapReady||!st.pos||!bLay.length)return;const src=MAP.getSource('here'),E0={type:'FeatureCollection',features:[]};
  if(st.est>3){src.setData(E0);return}
  const p=MAP.project([st.pos.lon,st.pos.lat]),f=MAP.queryRenderedFeatures([p.x,p.y],{layers:bLay})[0];
  src.setData(f?{type:'Feature',geometry:f.geometry,properties:{h:+f.properties.render_height||8,b:+f.properties.render_min_height||0}}:E0);
 }
 async function whereTick(){
- if(!st.pos||!navigator.onLine)return;const p=st.pos;
+ const p=refPos();if(!p||!navigator.onLine)return;
  if(lastQ.t&&hav(p,lastQ)<40)return;lastQ={lat:p.lat,lon:p.lon,t:Date.now()};
  try{const j=await(await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=${p.lat}&lon=${p.lon}`)).json(),a=j.address||{};
   const road=((a.house_number?a.house_number+' ':'')+(a.road||'')).trim(),area=[a.neighbourhood||a.suburb||a.village,a.city||a.town||a.county||a.state].filter(Boolean).join(', ');
@@ -320,40 +323,75 @@ setInterval(hereTick,900);setInterval(whereTick,6000);
 /* destination input: coordinates, map links, categories, or a place name */
 const okc=(a,b)=>Math.abs(a)<=90&&Math.abs(b)<=180?{la:a,lo:b}:null;
 function parseCoords(q){let m;
- if((m=q.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/))||(m=q.match(/@(-?\d+\.\d+),\s*(-?\d+\.\d+)/))||(m=q.match(/[?&](?:q|ll|destination|daddr|query)=(-?\d+\.?\d*)(?:,|%2C)\s*(-?\d+\.?\d*)/i)))return okc(+m[1],+m[2]);
+ if((m=q.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/))||(m=q.match(/@(-?\d+\.\d+),\s*(-?\d+\.\d+)/))||(m=q.match(/[?&](?:q|ll|destination|daddr|query|center)=(-?\d+\.?\d*)(?:,|%2C)\s*(-?\d+\.?\d*)/i))||(m=q.match(/geo:(-?\d+\.?\d*),(-?\d+\.?\d*)/i))||(m=q.match(/#map=\d+\/(-?\d+\.?\d*)\/(-?\d+\.?\d*)/))||(m=q.match(/mlat=(-?\d+\.?\d*)&mlon=(-?\d+\.?\d*)/)))return okc(+m[1],+m[2]);
  if((m=q.match(/(\d+)\s*°\s*(\d+)\s*['′’]\s*([\d.]+)\s*["″”]?\s*([NS])[\s,;]*(\d+)\s*°\s*(\d+)\s*['′’]\s*([\d.]+)\s*["″”]?\s*([EW])/i)))
   return okc((+m[1]+m[2]/60+m[3]/3600)*(/s/i.test(m[4])?-1:1),(+m[5]+m[6]/60+m[7]/3600)*(/w/i.test(m[8])?-1:1));
  if((m=q.match(/([NS])\s*(\d+\.?\d*)\s*°?[\s,;]+([EW])\s*(\d+\.?\d*)/i)))return okc(m[2]*(/s/i.test(m[1])?-1:1),m[4]*(/w/i.test(m[3])?-1:1));
  if((m=q.match(/(\d+\.?\d*)\s*°?\s*([NS])[\s,;]+(\d+\.?\d*)\s*°?\s*([EW])/i)))return okc(m[1]*(/s/i.test(m[2])?-1:1),m[3]*(/w/i.test(m[4])?-1:1));
  if((m=q.match(/^\s*\(?(-?\d{1,3}(?:\.\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)\)?\s*$/)))return okc(+m[1],+m[2])||okc(+m[2],+m[1]);
  return null}
+/* Plus Codes (Open Location Code), full or short with a town name */
+const OA='23456789CFGHJMPQRVWX';
+function olcDec(c){c=c.replace('+','').toUpperCase();const n=Math.min(c.length,10)&~1;let la=0,lo=0,r=20;for(let i=0;i<n;i+=2){la+=OA.indexOf(c[i])*r;lo+=OA.indexOf(c[i+1])*r;if(i<n-2)r/=20}return{la:la-90+r/2,lo:lo-180+r/2}}
+function olcPre(la,lo,n){la+=90;lo+=180;let r=20,o='';for(let i=0;i<n/2;i++){const a=Math.floor(la/r),b=Math.floor(lo/r);o+=OA[a]+OA[b];la-=a*r;lo-=b*r;r/=20}return o}
+function olcFix(code,rla,rlo){const t=code.toUpperCase(),pad=8-t.indexOf('+');if(pad<=0)return olcDec(t);
+ const d=olcDec(olcPre(rla,rlo,pad)+t),res=Math.pow(20,2-pad/2),h=res/2;
+ if(rla+h<d.la&&d.la-res>=-90)d.la-=res;else if(rla-h>d.la&&d.la+res<=90)d.la+=res;
+ if(rlo+h<d.lo)d.lo-=res;else if(rlo-h>d.lo)d.lo+=res;return d}
+async function plusCode(m){let ref=refPos();const full=m[1].indexOf('+')===8;
+ if(!full&&m[2]){try{const r=await(await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q='+encodeURIComponent(m[2]))).json();if(r[0])ref={lat:+r[0].lat,lon:+r[0].lon}}catch(e){}}
+ if(!full&&!ref){mapMsg('That is a short plus code. Add a town name after it, or allow location.',6000);return}
+ const d=olcFix(m[1],ref?ref.lat:0,ref?ref.lon:0);routeTo(d.la,d.lo,m[1]+(m[2]?' '+m[2]:''))}
 const CATS=[['Schools','["amenity"="school"]',/school/],['Secondary schools','["amenity"~"school|college"]["name"~"secondary|college|high|SSS|GSS|GSSS|senior|grammar",i]',/secondary|high school|senior|college|grammar/],['Hospitals & clinics','["amenity"~"hospital|clinic|doctors"]',/hospital|clinic|health|medical|doctor/],['Pharmacies','["amenity"="pharmacy"]',/pharm|chemist/],['Fuel','["amenity"="fuel"]',/fuel|petrol|gas station|filling/],['Airports','["aeroway"~"aerodrome|terminal"]',/airport|airstrip/],['Police','["amenity"="police"]',/police/],['Banks & ATMs','["amenity"~"bank|atm"]',/bank|atm/],['Food','["amenity"~"restaurant|fast_food|cafe"]',/restaurant|food|cafe/],['Hotels','["tourism"~"hotel|guest_house"]',/hotel|lodge|guest/],['Worship','["amenity"="place_of_worship"]',/church|mosque|worship/],['Markets','["amenity"="marketplace"]',/market/]];
-CATS.forEach(c=>{const b=document.createElement('button');b.type='button';b.textContent=c[0];b.onclick=()=>poiSearch(c);$('cats').appendChild(b)});
+renderChips();
 function catOf(q){q=q.toLowerCase();let k=-1;for(let i=CATS.length-1;i>=0;i--)if(CATS[i][2].test(q)){k=i;break}
  if(k<0)return -1;const all=new RegExp(CATS.map(c=>c[2].source).join('|'),'g');
  const rest=q.replace(all,'').replace(/\b(near|nearby|me|my|closest|nearest|all|the|a|in|around|here|some|find|show|public|private|government|s)\b/g,'').replace(/[^a-z]/g,'');
  return rest?-1:(/secondary|high school|senior|college|grammar/.test(q)?1:k)}
 const clearPois=()=>{POIS.forEach(m=>m.remove());POIS=[]};
-async function poiSearch(c){
- if(!st.pos){mapMsg('Waiting for GPS to search nearby',4000);return}
- mapMsg('Searching '+c[0].toLowerCase()+'…');const p=st.pos;
- try{const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(`[out:json][timeout:25];nwr${c[1]}(around:12000,${p.lat},${p.lon});out center 60;`)});
-  const j=await r.json(),L=j.elements.map(e=>{const la=e.lat??(e.center&&e.center.lat),lo=e.lon??(e.center&&e.center.lon);return la==null?null:{n:(e.tags&&(e.tags.name||e.tags['name:en']))||c[0].replace(/s$/,''),la,lo,d:hav(p,{lat:la,lon:lo})}}).filter(Boolean).sort((a,b)=>a.d-b.d).slice(0,8);
-  mapMsg('');showList(L)}catch(e){mapMsg('Nearby search failed. Try again in a moment.',5000)}}
-function showList(L){clearPois();const d=$('sugs');d.innerHTML=L.length?'':'<div>Nothing found within 12 km</div>';
- L.forEach(x=>{const b=document.createElement('button');b.type='button';b.textContent=x.n+' · '+fd(x.d);b.onclick=()=>{d.innerHTML='';clearPois();routeTo(x.la,x.lo,x.n)};d.appendChild(b);
-  if(mapReady){const e=document.createElement('div');e.className='poi';POIS.push(new maplibregl.Marker({element:e}).setLngLat([x.lo,x.la]).addTo(MAP))}})}
+const COL=i=>'hsl('+(i*31+20)+',70%,62%)';
+async function overpass(c,p){
+ const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(`[out:json][timeout:40];nwr${c[1]}(around:${RAD},${p.lat},${p.lon});out center 300;`)});
+ if(!r.ok)throw 0;const j=await r.json();
+ return j.elements.map(e=>{const la=e.lat??(e.center&&e.center.lat),lo=e.lon??(e.center&&e.center.lon);return la==null?null:{n:(e.tags&&(e.tags.name||e.tags['name:en']))||c[0].replace(/s$/,''),la,lo}}).filter(Boolean)}
+function renderChips(){const c=$('cats');c.innerHTML='';CATS.forEach((x,i)=>{const b=document.createElement('button');b.type='button';b.className=ACT.has(i)?'on':'';b.textContent=x[0]+(CACHE[i]?' '+CACHE[i].length:'');b.onclick=()=>toggleCat(i);c.appendChild(b)})}
+async function toggleCat(i){
+ if(ACT.has(i))ACT.delete(i);
+ else{ACT.add(i);if(!CACHE[i]){const p=refPos();if(!p){mapMsg('Allow location so I can search around you',4000);ACT.delete(i);return}
+  mapMsg('Loading '+CATS[i][0].toLowerCase()+'…');try{CACHE[i]=await overpass(CATS[i],p)}catch(e){mapMsg('That list is busy right now. Try again in a moment.',4000);ACT.delete(i);renderChips();return}mapMsg('')}}
+ renderChips();refreshPois(true)}
+const go=x=>{$('sugs').innerHTML='';clearPois();ACT.clear();renderChips();routeTo(x.la,x.lo,x.n)};
+function refreshPois(fit){clearPois();const p=refPos(),it=[];
+ ACT.forEach(i=>(CACHE[i]||[]).forEach(x=>it.push({...x,i,d:p?hav(p,{lat:x.la,lon:x.lo}):0})));it.sort((a,b)=>a.d-b.d);
+ const d=$('sugs');d.innerHTML='';it.slice(0,8).forEach(x=>{const b=document.createElement('button');b.type='button';b.textContent=x.n+' · '+fd(x.d);b.onclick=()=>go(x);d.appendChild(b)});
+ if(ACT.size&&!it.length)d.innerHTML='<div>Nothing found within 70 km</div>';
+ if(!mapReady)return;
+ it.slice(0,150).forEach(x=>{const e=document.createElement('div');e.className='poi';e.style.background=COL(x.i);e.title=x.n;e.onclick=()=>go(x);POIS.push(new maplibregl.Marker({element:e}).setLngLat([x.lo,x.la]).addTo(MAP))});
+ if(fit&&it.length&&(!st.pos||st.est<3)){const b=new maplibregl.LngLatBounds();if(p)b.extend([p.lon,p.lat]);it.slice(0,40).forEach(x=>b.extend([x.lo,x.la]));cam.hold=Date.now()+20000;MAP.fitBounds(b,{padding:70,pitch:0,bearing:0,duration:0,maxZoom:15})}}
+function showList(L,none){clearPois();const d=$('sugs');d.innerHTML=L.length?'':'<div>'+none+'</div>';
+ L.forEach(x=>{const b=document.createElement('button');b.type='button';b.textContent=x.n+(x.d?' · '+fd(x.d):'');b.onclick=()=>go(x);d.appendChild(b)})}
 async function search(q){q=q.trim();if(!q)return;clearPois();$('sugs').innerHTML='';
- if(/maps\.app\.goo\.gl|goo\.gl\/maps/.test(q)){mapMsg('Short links cannot be read. Open it, then paste the long link or the coordinates.',6000);return}
+ if(/maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs/.test(q)){mapMsg('Short links cannot be opened from here. Open it, then paste the long link or the coordinates.',7000);return}
+ const pm=q.match(PLUS);if(pm){plusCode(pm);return}
  const c=parseCoords(q);if(c){routeTo(c.la,c.lo,c.la.toFixed(5)+', '+c.lo.toFixed(5));return}
- const k=catOf(q);if(k>=0){poiSearch(CATS[k]);return}
- try{const pp=st.pos,r=await(await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q='+encodeURIComponent(q)+(pp?'&viewbox='+[pp.lon-1,pp.lat+1,pp.lon+1,pp.lat-1].join(','):''))).json();
-  showList(r.map(x=>({n:x.display_name.split(',').slice(0,3).join(','),la:+x.lat,lo:+x.lon,d:pp?hav(pp,{lat:+x.lat,lon:+x.lon}):0})))}
+ if(/^https?:\/\//i.test(q)){const n=q.match(/\/place\/([^/@?]+)/)||q.match(/[?&](?:q|query|destination|daddr)=([^&]+)/);
+  if(!n){mapMsg('I could not find a place in that link. Try the coordinates instead.',6000);return}try{q=decodeURIComponent(n[1].replace(/\+/g,' '))}catch(e){q=n[1]}}
+ const k=catOf(q);if(k>=0){if(!ACT.has(k))await toggleCat(k);return}
+ try{const pp=refPos(),r=await(await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q='+encodeURIComponent(q)+(pp?'&viewbox='+[pp.lon-1,pp.lat+1,pp.lon+1,pp.lat-1].join(','):''))).json();
+  showList(r.map(x=>({n:x.display_name.split(',').slice(0,3).join(','),la:+x.lat,lo:+x.lon,d:pp?hav(pp,{lat:+x.lat,lon:+x.lon}):0})),'No place found. Try coordinates, a plus code or a map link.')}
  catch(e){mapMsg('Search needs an internet connection',4000)}}
+/* nearby places load in the background as soon as we know roughly where you are */
+async function prefetch(){const p=refPos();if(!p||preBusy||!navigator.onLine)return;
+ if(preRef&&hav(p,preRef)<25000)return;if(preRef)for(const k in CACHE)delete CACHE[k];preRef={lat:p.lat,lon:p.lon};preBusy=true;
+ for(let i=0;i<CATS.length;i++){if(CACHE[i])continue;try{CACHE[i]=await overpass(CATS[i],p);renderChips();if(ACT.has(i))refreshPois(false)}catch(e){}await new Promise(r=>setTimeout(r,1500))}
+ preBusy=false}
+function onRef(){if(mapReady&&REF&&!st.pos&&!cam.init)MAP.jumpTo({center:[REF.lon,REF.lat],zoom:11.5,pitch:0,bearing:0,padding:{top:0}});prefetch();whereTick()}
+function locate(){if(REF)onRef();if(navigator.geolocation)navigator.geolocation.getCurrentPosition(q=>{REF={lat:q.coords.latitude,lon:q.coords.longitude};sv('apex.ref',{p:REF});onRef()},()=>{},{enableHighAccuracy:false,timeout:10000,maximumAge:600000})}
+setInterval(prefetch,60000);
 async function routeTo(la,lo,name){
- if(!st.pos){mapMsg('Waiting for GPS before starting the route',4000);return}
- try{const p=st.pos,j=await(await fetch(`https://router.project-osrm.org/route/v1/driving/${p.lon},${p.lat};${lo},${la}?overview=full&geometries=geojson&steps=true`)).json();
-  if(!j.routes||!j.routes[0])throw 0;setRoute(j.routes[0],la,lo,name)}catch(e){mapMsg('Could not find a route',4000)}}
+ const p=refPos();if(!p){mapMsg('Allow location so I can start the route',4000);return}
+ try{const j=await(await fetch(`https://router.project-osrm.org/route/v1/driving/${p.lon},${p.lat};${lo},${la}?overview=full&geometries=geojson&steps=true`)).json();
+  if(!j.routes||!j.routes[0])throw 0;setRoute(j.routes[0],la,lo,name)}catch(e){mapMsg('Could not find a route there',4000)}}
 function setRoute(rt,la,lo,name){
  const g=rt.geometry.coordinates,cum=[0],steps=[];let from=0,pend=null;
  for(let i=1;i<g.length;i++)cum.push(cum[i-1]+hav({lat:g[i-1][1],lon:g[i-1][0]},{lat:g[i][1],lon:g[i][0]}));
@@ -384,7 +422,7 @@ const turnSpd=q=>/sharp|uturn/.test(q.mod)?4:q.type==='roundabout'?8:(q.mod==='l
 $('dest').onkeydown=e=>{if(e.key==='Enter')search($('dest').value)};
 $('nx').onclick=()=>{NAV=null;if(mapReady)MAP.getSource('route').setData({type:'FeatureCollection',features:[]});navUI()};
 addEventListener('online',()=>{loadMap();mapMsg('')});addEventListener('offline',()=>mapMsg('Offline: the speedometer keeps running on GPS only'));
-if(navigator.onLine)loadMap();else mapMsg('Offline: the speedometer keeps running on GPS only');
+locate();if(navigator.onLine)loadMap();else mapMsg('Offline: the speedometer keeps running on GPS only');
 $('bTrip').onclick=()=>{$('trip').showModal();resize()};
 addEventListener('resize',resize);units();resize();requestAnimationFrame(loop);
 </script></body></html>
