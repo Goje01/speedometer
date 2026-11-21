@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Apex Drive</title><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#06090e"><link rel="icon" href="icon-192.png">
+<link href="./lib/maplibre-gl.css" rel="stylesheet">
+<link href="./lib/leaflet.css" rel="stylesheet">
+<link href="./lib/leaflet-routing-machine.css" rel="stylesheet">
+<link href="./lib/threebox.css" rel="stylesheet">
+<link href="./styles.css" rel="stylesheet">
+</head><body>
+<div id="app">
+<section id="mp">
+ <div id="map" aria-label="Interactive route map"></div>
+ <section class="controls" aria-label="Route controls">
+  <p class="eyebrow">Navigation mode</p>
+  <h1>Set your destination</h1>
+  <form id="destination-form">
+   <label for="destination">Address or place</label>
+   <div class="input-row destination-field">
+    <input id="destination" name="destination" placeholder="Place, hotel, lat/lng, [lng,lat], or Google Maps link" autocomplete="off" aria-autocomplete="list" aria-controls="destination-suggestions" required>
+    <button type="submit">Create route</button>
+   </div>
+   <ul id="destination-suggestions" class="suggestions" role="listbox" aria-label="Destination suggestions"></ul>
+  </form>
+  <p id="route-status" class="status" role="status">Press Start (real GPS) or Demo, then enter a destination.</p>
+  <div class="actions">
+   <button id="locate-button" type="button">Use my location</button>
+  </div>
+ </section>
+ <section id="drive-stage" class="drive-stage" aria-label="Driving visualisation">
+  <div class="stage-topline">
+   <span id="next-turn-icon" aria-hidden="true">↑</span>
+   <div><strong id="next-turn-text">No route yet</strong><small id="next-turn-distance">Enter a destination</small></div>
+   <div class="eta"><small>Arrival</small><strong id="eta-value">–</strong></div>
+  </div>
+ </section>
+</section>
+<section id="dp"><div id="unc" class="mu"></div><canvas id="g"></canvas></section>
+</div>
+<div id="bar"><div class="pill" id="gps"><i></i><span id="gpst">GPS off</span></div><button id="bStart">Start</button><button id="bUnit">km/h</button><button id="bDemo">Demo</button></div>
+<div class="dg" id="diag" hidden role="alert"></div>
+
+<script src="./lib/maplibre-gl.js"></script>
+<script>window.mapboxgl = window.maplibregl;</script>
+<script src="./lib/threebox.min.js"></script>
+<script src="./lib/leaflet.js"></script>
+<script src="./lib/leaflet-routing-machine.js"></script>
+<script src="./route-workflow.js"></script>
+<script src="./speedometer.js"></script>
+</body></html>
